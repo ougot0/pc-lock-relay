@@ -1,0 +1,11 @@
+app = "pc-lock-relay"
+primary_region = "cdg"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1   # le relais doit rester joignable en permanence

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PC Lock</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,sans-serif;
+         background:#0f1115; color:#e8eaed; display:flex; justify-content:center;
+         padding:20px; }
+  .card { width:100%; max-width:440px; background:#1a1d24; border:1px solid #2a2f3a;
+          border-radius:18px; padding:22px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .status { font-size:14px; margin:0 0 18px; opacity:.85; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%;
+         margin-right:8px; vertical-align:middle; background:#5b6472; }
+  label { display:block; font-size:13px; opacity:.7; margin:16px 0 6px; }
+  input, textarea { width:100%; padding:12px 14px; border-radius:12px;
+         border:1px solid #2a2f3a; background:#0f1115; color:#e8eaed; font-size:16px;
+         font-family:inherit; }
+  textarea { resize:vertical; min-height:60px; }
+  .btns { display:flex; gap:12px; margin-top:16px; }
+  button { flex:1; padding:15px; border:none; border-radius:14px; font-size:16px;
+           font-weight:600; cursor:pointer; color:#fff; }
+  .lock{background:#e5484d;} .unlock{background:#30a46c;}
+  .timer{background:#f2a63b;} .cancel{background:#5b6472;}
+  .save{width:100%; margin-top:12px; background:#3b6fe0; padding:13px; border:none;
+        border-radius:12px; color:#fff; font-size:15px; font-weight:600; cursor:pointer;}
+  .countdown{text-align:center; font-size:24px; font-weight:800; margin:14px 0 0;
+             min-height:28px; color:#f2a63b;}
+  hr.sep{border:none; border-top:1px solid #2a2f3a; margin:22px 0 4px;}
+  .ctrl{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:8px;}
+  .ctrl button{padding:14px 6px; font-size:14px;}
+  .pwr-off{background:#e5484d;} .pwr-sleep{background:#3b6fe0;} .pwr-restart{background:#8a5cf6;}
+  .monrow{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+  .monrow button{flex:1; min-width:64px; padding:10px; font-size:14px; border-radius:10px;
+                 background:#2a2f3a; color:#e8eaed;}
+  .monrow button.on{background:#30a46c; color:#fff;}
+  .screen{width:100%; border-radius:12px; margin-top:12px; display:none; background:#000;
+          cursor:pointer;}
+  .screen.full{position:fixed; inset:0; width:100vw; height:100vh; object-fit:contain;
+               z-index:1000; margin:0; border-radius:0;}
+  .err{color:#ff8a8a; font-size:13px; min-height:18px; margin-top:10px;}
+  .hint{text-align:center; font-size:12px; opacity:.6; margin:6px 0 0; display:none;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>PC Lock <span id="pcname" style="font-weight:400;opacity:.6;font-size:15px"></span></h1>
+    <p class="status"><span id="dot" class="dot"></span><span id="statusText">Connexion…</span></p>
+
+    <label>Code PIN</label>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN" oninput="savePin()">
+
+    <label>Phrase affichée sur le PC</label>
+    <textarea id="message"></textarea>
+    <button class="save" onclick="saveMsg()">Enregistrer la phrase</button>
+
+    <div class="btns">
+      <button class="lock" onclick="cmd({type:'lock'})">Verrouiller</button>
+      <button class="unlock" onclick="cmd({type:'unlock'})">Déverrouiller</button>
+    </div>
+
+    <label>Chrono avant verrouillage (minutes)</label>
+    <input id="minutes" type="number" inputmode="numeric" value="20" min="1">
+    <div class="btns">
+      <button class="timer" onclick="startTimer()">Démarrer le chrono</button>
+      <button class="cancel" onclick="cmd({type:'timer_cancel'})">Annuler</button>
+    </div>
+    <p class="countdown" id="countdown"></p>
+
+    <div class="btns">
+      <button class="timer" onclick="cmd({type:'alarm'})">Sonner l'alarme</button>
+      <button class="cancel" onclick="cmd({type:'alarm_stop'})">Arrêter l'alarme</button>
+    </div>
+
+    <hr class="sep">
+    <label>Contrôle du PC</label>
+    <div class="ctrl">
+      <button class="pwr-off" onclick="power('shutdown','Éteindre le PC ?')">Éteindre</button>
+      <button class="pwr-sleep" onclick="power('sleep','')">Veille</button>
+      <button class="pwr-restart" onclick="power('restart','Redémarrer le PC ?')">Redémarrer</button>
+    </div>
+
+    <label>Fermer une appli (nom, ex: chrome)</label>
+    <div class="btns">
+      <input id="appname" type="text" placeholder="chrome" style="flex:2">
+      <button class="cancel" style="flex:1" onclick="killApp()">Fermer</button>
+    </div>
+
+    <button class="save" id="screenBtn" style="background:#30a46c" onclick="toggleScreen()">Voir l'écran</button>
+    <div class="monrow" id="monrow" style="display:none"></div>
+    <div class="monrow" id="qualrow" style="display:none">
+      <button data-q="360" onclick="setQual(360)">Fluide</button>
+      <button data-q="540" onclick="setQual(540)">Moyen</button>
+      <button data-q="900" onclick="setQual(900)">Net</button>
+    </div>
+    <img id="screen" class="screen" alt="" onclick="toggleFull()">
+    <p class="hint" id="screenHint">Appuie sur l'image pour le plein écran</p>
+
+    <div class="err" id="err"></div>
+  </div>
+
+<script>
+// --- Parametres depuis l'URL (#d=<device_id>&n=<nom>) ---
+function parseHash() {
+  var h = location.hash.replace(/^#/, ''); var o = {};
+  h.split('&').forEach(function(kv){ var p = kv.split('='); if (p[0]) o[p[0]] = decodeURIComponent(p[1]||''); });
+  return o;
+}
+var P = parseHash();
+var deviceId = P.d || '';
+if (P.n) document.getElementById('pcname').textContent = '· ' + P.n;
+
+function savePin(){ try{ localStorage.setItem('pclock_pin_'+deviceId, pinVal()); }catch(e){} }
+function pinVal(){ return document.getElementById('pin').value; }
+try { var sp = localStorage.getItem('pclock_pin_'+deviceId); if (sp) document.getElementById('pin').value = sp; } catch(e){}
+
+// --- WebSocket vers le relais (meme origine) ---
+var ws = null, wsReady = false, online = false;
+function connect() {
+  if (!deviceId) { setStatus('Lien invalide (device manquant)', '#e5484d'); return; }
+  var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws/phone/' + deviceId);
+  ws.binaryType = 'blob';
+  ws.onopen = function(){ wsReady = true; };
+  ws.onclose = function(){ wsReady = false; online = false; render(); setTimeout(connect, 1500); };
+  ws.onerror = function(){ try{ ws.close(); }catch(e){} };
+  ws.onmessage = onMessage;
+}
+function onMessage(ev) {
+  if (typeof ev.data === 'string') {
+    var m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+    if (m.type === 'presence') { online = m.online; render(); }
+    else if (m.type === 'auth' && m.ok === false) { setErr(m.locked ? 'Trop d\'essais, patiente' : 'PIN incorrect'); }
+    else if (m.type === 'status') { applyStatus(m); }
+  } else {
+    showFrame(ev.data);   // image d'ecran (Blob)
+  }
+}
+function send(obj) {
+  if (!wsReady) return;
+  obj.pin = pinVal();
+  try { ws.send(JSON.stringify(obj)); } catch(e){}
+}
+function cmd(obj){ setErr(''); send(obj); }
+
+// --- Statut / rendu ---
+var lastTimerEnd = 0, screensCount = 0;
+function applyStatus(s) {
+  lockedState = s.locked;
+  lastTimerEnd = s.timer > 0 ? Date.now() + s.timer*1000 : 0;
+  var m = document.getElementById('message');
+  if (document.activeElement !== m && typeof s.message === 'string') m.value = s.message;
+  if (s.screens && s.screens !== screensCount) { screensCount = s.screens; buildMons(s.screens); }
+  render();
+}
+var lockedState = false;
+function render() {
+  var st = document.getElementById('statusText'), dot = document.getElementById('dot');
+  if (!online) { st.textContent = 'PC hors ligne'; dot.style.background = '#5b6472'; }
+  else if (lockedState) { st.textContent = 'PC VERROUILLÉ'; dot.style.background = '#e5484d'; }
+  else { st.textContent = 'PC en ligne'; dot.style.background = '#30a46c'; }
+}
+function tickCountdown() {
+  var cd = document.getElementById('countdown');
+  if (lastTimerEnd > Date.now()) {
+    var s = Math.round((lastTimerEnd - Date.now())/1000);
+    var mn = Math.floor(s/60), sc = s%60;
+    cd.textContent = 'Verrouillage dans ' + mn + ':' + (sc<10?'0':'') + sc;
+  } else cd.textContent = '';
+}
+setInterval(tickCountdown, 500);
+// Poll statut leger (reflete aussi le verrou auto du chrono)
+setInterval(function(){ if (online && pinVal()) send({type:'status'}); }, 2000);
+
+function setStatus(t,c){ var st=document.getElementById('statusText'); st.textContent=t; if(c) document.getElementById('dot').style.background=c; }
+function setErr(t){ document.getElementById('err').textContent = t||''; }
+
+// --- Actions ---
+function saveMsg(){ setErr(''); send({type:'message', message: document.getElementById('message').value});
+  var e=document.getElementById('err'); e.style.color='#8affc0'; e.textContent='Phrase enregistrée';
+  setTimeout(function(){ e.textContent=''; e.style.color='#ff8a8a'; }, 1500); }
+function startTimer(){ setErr(''); send({type:'timer', minutes: parseFloat(document.getElementById('minutes').value)||20}); }
+function power(mode,msg){ if (msg && !confirm(msg)) return; setErr(''); send({type:'power', mode:mode}); }
+function killApp(){ var n=document.getElementById('appname').value.trim(); if(!n) return; setErr(''); send({type:'kill', name:n});
+  var e=document.getElementById('err'); e.style.color='#8affc0'; e.textContent='Commande envoyée';
+  setTimeout(function(){ e.textContent=''; e.style.color='#ff8a8a'; }, 1500); }
+
+// --- Ecran ---
+var screenOn=false, currentMon='0', currentW=360, monsBuilt=0, lastUrl=null, pending=false;
+function buildMons(n){
+  if (monsBuilt===n) return; monsBuilt=n;
+  var row=document.getElementById('monrow'); row.innerHTML='';
+  function mk(v,l){ var b=document.createElement('button'); b.textContent=l; b.setAttribute('data-m',v);
+    b.onclick=function(){ currentMon=v; markMon(); }; row.appendChild(b); }
+  mk('all','Tous'); for (var i=0;i<n;i++) mk(String(i),'Écran '+(i+1)); markMon();
+}
+function markMon(){ document.querySelectorAll('#monrow button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===currentMon); }); }
+function setQual(v){ currentW=v; document.querySelectorAll('#qualrow button').forEach(function(b){ b.classList.toggle('on', parseInt(b.getAttribute('data-q'))===v); }); }
+function requestFrame(){ if (!screenOn || pending) return; pending=true; send({type:'screen', mon:currentMon, w:currentW}); }
+function showFrame(blob){
+  pending=false;
+  if (!screenOn) return;
+  var url=URL.createObjectURL(blob);
+  var img=document.getElementById('screen');
+  img.onload=function(){ if(lastUrl) URL.revokeObjectURL(lastUrl); lastUrl=url; };
+  img.src=url;
+  setTimeout(requestFrame, 25);   // enchaine
+}
+function toggleScreen(){
+  if (!screenOn && !pinVal()){ setErr('Tape ton PIN d\'abord'); return; }
+  screenOn=!screenOn;
+  var img=document.getElementById('screen'), btn=document.getElementById('screenBtn');
+  var mr=document.getElementById('monrow'), qr=document.getElementById('qualrow'), hint=document.getElementById('screenHint');
+  if (screenOn){ img.style.display='block'; mr.style.display='flex'; qr.style.display='flex'; hint.style.display='block';
+    setQual(currentW); markMon(); requestFrame(); btn.textContent="Cacher l'écran"; }
+  else { img.style.display='none'; mr.style.display='none'; qr.style.display='none'; hint.style.display='none';
+    img.classList.remove('full'); btn.textContent="Voir l'écran"; }
+}
+function toggleFull(){ document.getElementById('screen').classList.toggle('full'); }
+
+render();
+connect();
+</script>
+</body>
+</html>
